@@ -1,0 +1,12 @@
+diff -Naur libfaketime-0.9.5rc2-orig/src/Makefile libfaketime-0.9.5rc2/src/Makefile
+--- libfaketime-0.9.5rc2-orig/src/Makefile	2013-10-04 04:21:42.000000000 -0400
++++ libfaketime-0.9.5rc2/src/Makefile	2013-10-04 17:37:31.346865090 -0400
+@@ -76,7 +76,7 @@
+ 	${CC} -o $@ -Wl,-soname,$@ ${LDFLAGS} ${LIB_LDFLAGS} $< ${LDADD}
+ 
+ ${BINS}: faketime.c
+-	${CC} -o $@ ${CFLAGS} ${EXTRA_FLAGS} $< ${LDFLAGS}
++	${CC} -o $@ ${CFLAGS} ${EXTRA_FLAGS} -lpthread $< ${LDFLAGS}
+ 
+ clean:
+ 	@rm -f ${LIBS_OBJ} ${LIBS} ${BINS}
