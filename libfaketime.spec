@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.6
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: GPLv2+
 Url: http://www.code-wizards.com/projects/%{name}/
 Source: http://www.code-wizards.com/projects/%{name}/%{name}-%{version}.tar.gz
@@ -44,6 +44,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Wed Jun 17 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 0.9.6-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_23_Mass_Rebuild
+
 * Tue Oct 28 2014 Paul Wouters <pwouters@redhat.com> - 0.9.6-1
 - Upgraded to 0.9.6 which adds option to disable monotonic time faking
 - fix permissions for symbol stripping for debug package
