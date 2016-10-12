@@ -26,7 +26,7 @@ sed -i -e 's/__asm__(".symver timer_settime_22/\/\/__asm__(".symver timer_settim
 
 
 %build
-cd src ; CFLAGS="%{optflags} -Wno-strict-aliasing" make %{?_smp_mflags} \
+cd src ; CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mflags} \
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
 %check
