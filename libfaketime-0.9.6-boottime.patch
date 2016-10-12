@@ -1,0 +1,64 @@
+From 628c70a67a94b3020cab79171545721dfd295fcd Mon Sep 17 00:00:00 2001
+From: Mario Pareja <pareja.mario@gmail.com>
+Date: Fri, 9 Jan 2015 18:15:53 +0000
+Subject: [PATCH] Begin adding CLOCK_BOOTTIME support.
+
+---
+ src/faketime_common.h | 2 ++
+ src/libfaketime.c     | 9 ++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/src/faketime_common.h b/src/faketime_common.h
+index ee0d627..7de6cd8 100644
+--- a/src/faketime_common.h
++++ b/src/faketime_common.h
+@@ -32,6 +32,8 @@ struct system_time_s
+   struct timespec mon;
+   /* System time according to CLOCK_MONOTONIC_RAW */
+   struct timespec mon_raw;
++  /* System time according to CLOCK_BOOTTIME */
++  struct timespec boot;
+ };
+ 
+ /* Data shared among faketime-spawned processes */
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index f4a26be..121bbf6 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -208,7 +208,7 @@ static int cache_duration = 10;     /* cache fake time input for 10 seconds */
+  * Static timespec to store our startup time, followed by a load-time library
+  * initialization declaration.
+  */
+-static struct system_time_s ftpl_starttime = {{0, -1}, {0, -1}, {0, -1}};
++static struct system_time_s ftpl_starttime = {{0, -1}, {0, -1}, {0, -1}, {0, -1}};
+ 
+ static char user_faked_time_fmt[BUFSIZ] = {0};
+ 
+@@ -319,6 +319,7 @@ static void system_time_from_system (struct system_time_s * systime)
+   DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_REALTIME, &systime->real));
+   DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_MONOTONIC, &systime->mon));
+   DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_MONOTONIC_RAW, &systime->mon_raw));
++  DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_BOOTTIME, &systime->boot));
+ #endif
+ }
+ 
+@@ -1834,6 +1835,9 @@ int fake_clock_gettime(clockid_t clk_id, struct timespec *tp)
+       case CLOCK_MONOTONIC_RAW:
+         timespecsub(tp, &ftpl_starttime.mon_raw, &tmp_ts);
+         break;
++      case CLOCK_BOOTTIME:
++        timespecsub(tp, &ftpl_starttime.boot, &tmp_ts);
++        break;
+       default:
+         printf("Invalid clock_id for clock_gettime: %d", clk_id);
+         exit(EXIT_FAILURE);
+@@ -1973,6 +1977,9 @@ int fake_clock_gettime(clockid_t clk_id, struct timespec *tp)
+           case CLOCK_MONOTONIC_RAW:
+             timespecsub(tp, &ftpl_starttime.mon_raw, &tdiff);
+             break;
++          case CLOCK_BOOTTIME:
++            timespecsub(tp, &ftpl_starttime.boot, &tdiff);
++            break;
+           default:
+             printf("Invalid clock_id for clock_gettime: %d", clk_id);
+             exit(EXIT_FAILURE);
