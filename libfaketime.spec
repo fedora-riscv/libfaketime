@@ -9,6 +9,7 @@ Group: System Environment/Libraries
 Patch1: libfaketime-0.9.5-fix-infinite-recursion-on-real_clock_gettime.patch
 Patch2: libfaketime-0.9.6-boottime.patch
 
+BuildRequires:  gcc
 %description
 libfaketime intercepts various system calls which programs use to
 retrieve the current date and time. It can then report faked dates and
