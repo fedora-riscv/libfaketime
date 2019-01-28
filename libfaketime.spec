@@ -5,7 +5,6 @@ Release: 8%{?dist}
 License: GPLv2+
 Url: http://www.code-wizards.com/projects/libfaketime/
 Source: http://www.code-wizards.com/projects/%{name}/%{name}-%{version}.tar.gz
-Group: System Environment/Libraries
 Patch1: libfaketime-0.9.5-fix-infinite-recursion-on-real_clock_gettime.patch
 Patch2: libfaketime-0.9.6-boottime.patch
 
