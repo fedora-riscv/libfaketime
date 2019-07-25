@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.6
-Release: 9%{?dist}
+Release: 10%{?dist}
 License: GPLv2+
 Url: http://www.code-wizards.com/projects/libfaketime/
 Source: http://www.code-wizards.com/projects/%{name}/%{name}-%{version}.tar.gz
@@ -46,6 +46,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.6-10
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+
 * Fri Feb 01 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.6-9
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
 
