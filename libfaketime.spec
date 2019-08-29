@@ -1,14 +1,15 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
-Version: 0.9.6
-Release: 10%{?dist}
+Version: 0.9.8
+Release: 3%{?dist}
 License: GPLv2+
-Url: http://www.code-wizards.com/projects/libfaketime/
-Source: http://www.code-wizards.com/projects/%{name}/%{name}-%{version}.tar.gz
-Patch1: libfaketime-0.9.5-fix-infinite-recursion-on-real_clock_gettime.patch
-Patch2: libfaketime-0.9.6-boottime.patch
+Url: https://github.com/wolfcw/libfaketime
+Source: libfaketime-0.9.8.tar.xz
+Patch0: libfaketime-0.9.8-FORCE_PTHREAD_NONVER.patch
 
 BuildRequires:  gcc
+BuildRequires:  perl-interpreter
+BuildRequires:  perl-Time-HiRes
 %description
 libfaketime intercepts various system calls which programs use to
 retrieve the current date and time. It can then report faked dates and
@@ -18,15 +19,29 @@ time system- wide.
 
 %prep
 %setup -q
-%patch1 -p1
-%patch2 -p1
-# work around from upstream for autodetecting glibc version bug on i686
-sed -i -e 's/__asm__(".symver timer_gettime_22/\/\/__asm__(".symver timer_gettime_22/' src/libfaketime.c
-sed -i -e 's/__asm__(".symver timer_settime_22/\/\/__asm__(".symver timer_settime_22/' src/libfaketime.c
+%patch0 -p1
 
 
 %build
-cd src ; CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mflags} \
+cd src
+%if 0%{?el7}
+  %ifarch x86_64
+    echo "old glibc https://github.com/wolfcw/libfaketime/issues/202"
+    export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX"
+  %endif
+  %ifarch aarch64 ppc64le
+    echo "old glibc and pthread_nonver https://github.com/wolfcw/libfaketime/issues/205"
+    export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
+  %endif
+%else
+  %ifarch ppc64le
+    echo "pthread_nonver https://github.com/wolfcw/libfaketime/issues/204"
+    export FAKETIME_COMPILE_CFLAGS="-DFORCE_PTHREAD_NONVER"
+  %else
+    unset FAKETIME_COMPILE_CFLAGS
+  %endif
+%endif
+CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mflags} \
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
 %check
@@ -46,8 +61,12 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
-* Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.6-10
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+* Wed Aug 28 2019 Warren Togami <warren@blocksream.com> - 0.9.8-3
+- 0.9.8
+- x86_64  EL7: DFORCE_MONOTONIC_FIX
+  aarch64 EL7: DFORCE_MONOTONIC_FIX and FORCE_PTHREAD_NONVER
+  ppc64le EL7: DFORCE_MONOTONIC_FIX and FORCE_PTHREAD_NONVER
+  ppc64le F30+ FORCE_PTHREAD_NONVER
 
 * Fri Feb 01 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.6-9
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
