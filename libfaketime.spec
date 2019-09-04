@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
@@ -24,16 +24,25 @@ time system- wide.
 
 %build
 cd src
+
+# https://github.com/wolfcw/libfaketime/blob/master/README.packagers
+# Upstream libfaketime requires a mess of different compile time flags for different glibc versions and architectures.
+# https://github.com/wolfcw/libfaketime/pull/178
+# Goal is to build time autodetect these with autotools in the next release ...
+
+FAKETIME_COMPILE_CFLAGS="BOGUS"
 %if 0%{?el7}
   %ifarch x86_64
-    echo "old glibc https://github.com/wolfcw/libfaketime/issues/202"
+    echo "force_monotonic https://github.com/wolfcw/libfaketime/issues/202"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX"
   %endif
   %ifarch aarch64 ppc64le
-    echo "old glibc and pthread_nonver https://github.com/wolfcw/libfaketime/issues/205"
+    echo "force_monotonic and pthread_nonver https://github.com/wolfcw/libfaketime/issues/205"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
   %endif
-%else
+%endif
+%if 0%{?fedora} == 30 || 0%{?el8}
+  # only ppc64le needs a workaround
   %ifarch ppc64le
     echo "pthread_nonver https://github.com/wolfcw/libfaketime/issues/204"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_PTHREAD_NONVER"
@@ -41,6 +50,26 @@ cd src
     unset FAKETIME_COMPILE_CFLAGS
   %endif
 %endif
+%if 0%{?fedora} >= 31
+  # for reasons we don't know the old glibc workaround is required here but not on archv7hl and aarch64 ...
+  %ifarch i686 x86_64 s390x
+    echo "force_monotonic"
+    export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX"
+  %endif
+  %ifarch ppc64le
+    echo "force_monotonic and pthread_nonver"
+    export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
+  %endif
+  %ifarch armv7hl aarch64
+    unset FAKETIME_COMPILE_CFLAGS
+  %endif
+%endif
+
+if [ "$FAKETIME_COMPILE_CFLAGS" == "BOGUS" ]; then
+  echo "SHOULD NEVER REACH HERE ... YOU HAVE AN UNTESTED VERSION+ARCH, see rpm spec for details ... ABORT"
+  exit 1
+fi
+
 CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mflags} \
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
@@ -61,7 +90,11 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
-* Wed Aug 28 2019 Warren Togami <warren@blocksream.com> - 0.9.8-3
+* Tue Sep 03 2019 Warren Togami <warren@blockstream.com> - 0.9.8-4
+- upstream says to use FORCE_PTHREAD_NONVER on any glibc+arch that gets stuck
+  For Fedora 31+ "make test" gets stuck on i686 x86_64 ppc64le s390x
+
+* Wed Aug 28 2019 Warren Togami <warren@blockstream.com> - 0.9.8-3
 - 0.9.8
 - x86_64  EL7: DFORCE_MONOTONIC_FIX
   aarch64 EL7: DFORCE_MONOTONIC_FIX and FORCE_PTHREAD_NONVER
