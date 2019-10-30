@@ -1,15 +1,18 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
 Patch0: libfaketime-0.9.8-FORCE_PTHREAD_NONVER.patch
 
+Provides: faketime
+
 BuildRequires:  gcc
 BuildRequires:  perl-interpreter
 BuildRequires:  perl-Time-HiRes
+
 %description
 libfaketime intercepts various system calls which programs use to
 retrieve the current date and time. It can then report faked dates and
@@ -20,7 +23,6 @@ time system- wide.
 %prep
 %setup -q
 %patch0 -p1
-
 
 %build
 cd src
@@ -74,7 +76,7 @@ CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mfla
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
 %check
-make %{?_smp_mflags} -C test all
+make %{?_smp_mflags} -C test
 
 %install
 make PREFIX="%{_prefix}" DESTDIR=%{buildroot} LIBDIRNAME="/%{_lib}/faketime" install
@@ -82,14 +84,20 @@ rm -r %{buildroot}/%{_docdir}/faketime
 # needed for stripping/debug package
 chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 
+
 %files
 %{_bindir}/faketime
 %dir %attr(0755, root, root) %{_libdir}/faketime/
 %attr(0755, root, root) %{_libdir}/faketime/libfaketime*so.*
-%doc README COPYING NEWS README README.developers
+%license COPYING
+%doc README NEWS README.developers
 %{_mandir}/man1/*
 
 %changelog
+* Tue Oct 29 2019 Paul Wouters <pwouters@redhat.com> - 0.9.8-5
+- Resolves: rhbz#1766749 libfaketime rfe: please add Provides:faketime
+- Use license tag, remove duplicate README entry, update make test target
+
 * Tue Sep 03 2019 Warren Togami <warren@blockstream.com> - 0.9.8-4
 - upstream says to use FORCE_PTHREAD_NONVER on any glibc+arch that gets stuck
   For Fedora 31+ "make test" gets stuck on i686 x86_64 ppc64le s390x
