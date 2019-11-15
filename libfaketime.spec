@@ -42,6 +42,9 @@ FAKETIME_COMPILE_CFLAGS="BOGUS"
     echo "force_monotonic and pthread_nonver https://github.com/wolfcw/libfaketime/issues/205"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
   %endif
+  %ifarch armv7hl
+    unset FAKETIME_COMPILE_CFLAGS
+  %endif
 %endif
 %if 0%{?fedora} == 30 || 0%{?el8}
   # only ppc64le needs a workaround
