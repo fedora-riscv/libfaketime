@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
@@ -97,6 +97,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Wed Jan 29 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.8-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
+
 * Tue Oct 29 2019 Paul Wouters <pwouters@redhat.com> - 0.9.8-5
 - Resolves: rhbz#1766749 libfaketime rfe: please add Provides:faketime
 - Use license tag, remove duplicate README entry, update make test target
