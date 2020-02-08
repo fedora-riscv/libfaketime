@@ -79,6 +79,9 @@ CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mfla
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
 %check
+%if 0%{?fedora} >= 32
+    FAKETIME_COMPILE_CFLAGS="-Wno-error=deprecated-declarations" \
+%endif
 make %{?_smp_mflags} -C test
 
 %install
@@ -97,6 +100,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Sat Feb 08 2020 Pablo Greco <pgreco@centosproject.org> - 0.9.8-6
+- Fix build with gcc10
+
 * Wed Jan 29 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.8-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
 
