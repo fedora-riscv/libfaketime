@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
@@ -25,6 +25,11 @@ time system- wide.
 %patch0 -p1
 
 %build
+# This package uses toplevel ASMs to implement symbol versioning which is
+# incompatible with LTO.  So disable LTO until the package uses the attribute
+# mechanism to handle symbol versioning
+%define _lto_cflags %{nil}
+
 cd src
 
 # https://github.com/wolfcw/libfaketime/blob/master/README.packagers
@@ -100,6 +105,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Fri Jul 10 2020 Jeff Law <law@redhat.com> - 0.9.8-7
+- Disable LTO
+
 * Sat Feb 08 2020 Pablo Greco <pgreco@centosproject.org> - 0.9.8-6
 - Fix build with gcc10
 
