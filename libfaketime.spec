@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
@@ -105,6 +105,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Tue Jul 28 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.8-8
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
 * Fri Jul 10 2020 Jeff Law <law@redhat.com> - 0.9.8-7
 - Disable LTO
 
