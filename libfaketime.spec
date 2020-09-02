@@ -103,7 +103,7 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
-* Wed Sep 02 2020 Jeff Law <pgreco@centosproject.org> - 0.9.8-10
+* Wed Sep 02 2020 Pablo Greco <pgreco@centosproject.org> - 0.9.8-10
 - Conditionals to build 0.9.8-9 in f31 and epel7-8
 - Use upstream's version of the gcc10 fix
 
