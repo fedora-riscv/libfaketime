@@ -1,12 +1,13 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.8
-Release: 9%{?dist}
+Release: 10%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.8.tar.xz
 Patch0: libfaketime-0.9.8-FORCE_PTHREAD_NONVER.patch
 Patch1: libfaketime-symver.patch
+Patch2: libfaketime-fixgcc10.patch
 
 Provides: faketime
 
@@ -24,7 +25,10 @@ time system- wide.
 %prep
 %setup -q
 %patch0 -p1
+%if 0%{?fedora} >= 32 || 0%{?rhel} >= 9
 %patch1 -p1
+%endif
+%patch2 -p1
 
 %build
 cd src
@@ -81,9 +85,6 @@ CFLAGS="%{optflags} -Wno-nonnull-compare -Wno-strict-aliasing" make %{?_smp_mfla
          PREFIX="%{_prefix}" LIBDIRNAME="/%{_lib}/faketime" all
 
 %check
-%if 0%{?fedora} >= 32
-    FAKETIME_COMPILE_CFLAGS="-Wno-error=deprecated-declarations" \
-%endif
 make %{?_smp_mflags} -C test
 
 %install
@@ -102,6 +103,10 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Wed Sep 02 2020 Jeff Law <pgreco@centosproject.org> - 0.9.8-10
+- Conditionals to build 0.9.8-9 in f31 and epel7-8
+- Use upstream's version of the gcc10 fix
+
 * Wed Sep 02 2020 Jeff Law <law@redhat.com> - 0.9.8-9
 - Use symver attribute instead of asms for symbol versioning
 - Enable LTO
