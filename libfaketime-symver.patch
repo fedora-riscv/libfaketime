@@ -1,0 +1,104 @@
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index b70a3d3..19f6234 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -1643,6 +1643,7 @@ timer_settime_common(timer_t_or_int timerid, int flags,
+ /*
+  * Faked timer_settime() compatible with implementation in GLIBC 2.2
+  */
++__attribute__ ((symver ("timer_settime@GLIBC_2.2")))
+ int timer_settime_22(int timerid, int flags,
+          const struct itimerspec *new_value,
+          struct itimerspec *old_value)
+@@ -1665,6 +1666,7 @@ int timer_settime_22(int timerid, int flags,
+ /*
+  * Faked timer_settime() compatible with implementation in GLIBC 2.3.3
+  */
++__attribute__ ((symver ("timer_settime@@GLIBC_2.3.3")))
+ int timer_settime_233(timer_t timerid, int flags,
+       const struct itimerspec *new_value,
+       struct itimerspec *old_value)
+@@ -1735,6 +1737,7 @@ int timer_gettime_common(timer_t_or_int timerid, struct itimerspec *curr_value,
+ /*
+  * Faked timer_gettime() compatible with implementation in GLIBC 2.2
+  */
++__attribute__ ((symver ("timer_gettime@GLIBC_2.2")))
+ int timer_gettime_22(timer_t timerid, struct itimerspec *curr_value)
+ {
+   if (!initialized)
+@@ -1755,6 +1758,7 @@ int timer_gettime_22(timer_t timerid, struct itimerspec *curr_value)
+ /*
+  * Faked timer_gettime() compatible with implementation in GLIBC 2.3.3
+  */
++__attribute__ ((symver ("timer_gettime@@GLIBC_2.3.3")))
+ int timer_gettime_233(timer_t timerid, struct itimerspec *curr_value)
+ {
+   if (!initialized)
+@@ -1772,10 +1776,6 @@ int timer_gettime_233(timer_t timerid, struct itimerspec *curr_value)
+   }
+ }
+ 
+-__asm__(".symver timer_gettime_22, timer_gettime@GLIBC_2.2");
+-__asm__(".symver timer_gettime_233, timer_gettime@@GLIBC_2.3.3");
+-__asm__(".symver timer_settime_22, timer_settime@GLIBC_2.2");
+-__asm__(".symver timer_settime_233, timer_settime@@GLIBC_2.3.3");
+ 
+ #endif
+ #endif
+@@ -3012,6 +3012,11 @@ struct pthread_cond_monotonic {
+ 
+ static struct pthread_cond_monotonic *monotonic_conds = NULL;
+ 
++#if defined __ARM_ARCH || defined FORCE_PTHREAD_NONVER
++__attribute__ ((symver ("pthread_cond_init@@")))
++#else
++__attribute__ ((symver ("pthread_cond_init@@GLIBC_2.3.2")))
++#endif
+ int pthread_cond_init_232(pthread_cond_t *restrict cond, const pthread_condattr_t *restrict attr)
+ {
+   clockid_t clock_id;
+@@ -3039,6 +3044,11 @@ int pthread_cond_init_232(pthread_cond_t *restrict cond, const pthread_condattr_
+   return result;
+ }
+ 
++#if defined __ARM_ARCH || defined FORCE_PTHREAD_NONVER
++__attribute__ ((symver ("pthread_cond_destroy@@")))
++#else
++__attribute__ ((symver ("pthread_cond_destroy@@GLIBC_2.3.2")))
++#endif
+ int pthread_cond_destroy_232(pthread_cond_t *cond)
+ {
+   struct pthread_cond_monotonic* e;
+@@ -3146,26 +3156,22 @@ int pthread_cond_timedwait_common(pthread_cond_t *cond, pthread_mutex_t *mutex,
+   return result;
+ }
+ 
++__attribute__ ((symver ("pthread_cond_timedwait@GLIBC_2.2.5")))
+ int pthread_cond_timedwait_225(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime)
+ {
+   return pthread_cond_timedwait_common(cond, mutex, abstime, FT_COMPAT_GLIBC_2_2_5);
+ }
+ 
++#if defined __ARM_ARCH || defined FORCE_PTHREAD_NONVER
++__attribute__ ((symver ("pthread_cond_timedwait@@")))
++#else
++__attribute__ ((symver ("pthread_cond_timedwait@@GLIBC_2.3.2")))
++#endif
+ int pthread_cond_timedwait_232(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime)
+ {
+   return pthread_cond_timedwait_common(cond, mutex, abstime, FT_COMPAT_GLIBC_2_3_2);
+ }
+ 
+-__asm__(".symver pthread_cond_timedwait_225, pthread_cond_timedwait@GLIBC_2.2.5");
+-#if defined __ARM_ARCH || defined FORCE_PTHREAD_NONVER
+-__asm__(".symver pthread_cond_timedwait_232, pthread_cond_timedwait@@");
+-__asm__(".symver pthread_cond_init_232, pthread_cond_init@@");
+-__asm__(".symver pthread_cond_destroy_232, pthread_cond_destroy@@");
+-#else
+-__asm__(".symver pthread_cond_timedwait_232, pthread_cond_timedwait@@GLIBC_2.3.2");
+-__asm__(".symver pthread_cond_init_232, pthread_cond_init@@GLIBC_2.3.2");
+-__asm__(".symver pthread_cond_destroy_232, pthread_cond_destroy@@GLIBC_2.3.2");
+-#endif
+ 
+ #endif
+ 
