@@ -14,6 +14,7 @@ Provides: faketime
 BuildRequires:  gcc
 BuildRequires:  perl-interpreter
 BuildRequires:  perl-Time-HiRes
+BuildRequires: make
 
 %description
 libfaketime intercepts various system calls which programs use to
