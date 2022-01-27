@@ -1,0 +1,874 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolfgang.hommel@unibw.de>
+Date: Fri, 4 Mar 2022 20:33:18 +0100
+Subject: [PATCH 01/16] Update NEWS file about v0.9.10 changes
+
+---
+ NEWS | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/NEWS b/NEWS
+index 2ed3d44..e6bbc0a 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,4 +1,6 @@
+ Since 0.9.9:
++    - automatically try to decide about FORCE_MONOTONIC_FIX
++      at run-time when not set as a compile-time flag
+     - improved macOS Monterey support through dyld interposing
+     - changed interception hooks for stat() and similar functions,
+       refactored to use a common handler (@sirainen)
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ian Norton <ian.norton@ncipher.com>
+Date: Fri, 18 Mar 2022 12:03:24 +0000
+Subject: [PATCH 02/16] fixes #374 fix compiling without FAKE_STAT
+
+---
+ src/libfaketime.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index e632395..0c28e5f 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -830,6 +830,10 @@ static bool load_time(struct timespec *tp)
+  *      Faked system functions: file related                     === FAKE(FILE)
+  *      =======================================================================
+  */
++#ifdef FAKE_UTIME
++static int fake_utime_disabled = 0;
++#endif
++
+ 
+ #ifdef FAKE_STAT
+ 
+@@ -843,7 +847,6 @@ static bool load_time(struct timespec *tp)
+ #include <sys/stat.h>
+ 
+ static int fake_stat_disabled = 0;
+-static int fake_utime_disabled = 1;
+ static bool user_per_tick_inc_set_backup = false;
+ 
+ void lock_for_stat()
+@@ -2699,9 +2702,8 @@ static void ftpl_init(void)
+   }
+ #endif
+ #if defined FAKE_FILE_TIMESTAMPS
+-#ifndef FAKE_UTIME
+-  fake_utime_disabled = 0; // Defaults to enabled w/o FAKE_UTIME define
+-#endif
++#ifdef FAKE_UTIME
++  // fake_utime_disabled is 0 by default
+   if ((tmp_env = getenv("FAKE_UTIME")) != NULL) //Note that this is NOT re-checked
+   {
+     if (!*tmp_env || *tmp_env == 'y' || *tmp_env == 'Y' || *tmp_env == 't' || *tmp_env == 'T')
+@@ -2713,6 +2715,10 @@ static void ftpl_init(void)
+       fake_utime_disabled = !atoi(tmp_env);
+     }
+   }
++#else
++  // compiled without FAKE_UTIME support, so don't allow it to be controlled by the env var
++  fake_utime_disabled = 1;
++#endif
+ #endif
+ 
+   if ((tmp_env = getenv("FAKETIME_CACHE_DURATION")) != NULL)
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolf@code-wizards.com>
+Date: Sat, 2 Apr 2022 13:47:04 +0200
+Subject: [PATCH 03/16] select(): Scale timeout parameter by user rate on
+ return (addresses #382)
+
+---
+ src/libfaketime.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index 0c28e5f..684f153 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -1725,6 +1725,21 @@ int select(int nfds, fd_set *readfds,
+ #else
+   DONT_FAKE_TIME(ret = (*real_select)(nfds, readfds, writefds, errorfds, timeout == NULL ? timeout : &timeout_real));
+ #endif
++
++  /* scale timeout back if user rate is set, #382 */
++  if (user_rate_set && (timeout != NULL)) 
++  {
++    struct timespec ts;
++
++    ts.tv_sec = timeout_real.tv_sec;
++    ts.tv_nsec = timeout_real.tv_usec * 1000;
++
++    timespecmul(&ts, user_rate, &ts);
++
++    timeout->tv_sec = ts.tv_sec;
++    timeout->tv_usec = ts.tv_nsec / 1000;
++  } 
++
+   return ret;
+ }
+ 
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolf@code-wizards.com>
+Date: Sat, 2 Apr 2022 13:52:18 +0200
+Subject: [PATCH 04/16] Honor tv_nsec in timeouts on ppoll() calls (addresses
+ #381)
+
+---
+ src/libfaketime.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index 684f153..f92ecf8 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -1567,7 +1567,7 @@ int ppoll(struct pollfd *fds, nfds_t nfds,
+   }
+   if (timeout_ts != NULL)
+   {
+-    if (user_rate_set && !dont_fake && (timeout_ts->tv_sec > 0))
++    if (user_rate_set && !dont_fake && ((timeout_ts->tv_sec > 0) || (timeout_ts->tv_nsec > 0)))
+     {
+       timespecmul(timeout_ts, 1.0 / user_rate, &real_timeout);
+       real_timeout_pt = &real_timeout;
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Sat, 16 Apr 2022 10:05:40 -0700
+Subject: [PATCH 05/16] tests: clean whitespace in Makefile
+
+---
+ test/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/Makefile b/test/Makefile
+index 1b2a4aa..0a76a66 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -7,7 +7,7 @@ SRC = timetest.c
+ OBJ = ${SRC:.c=.o}
+ 
+ TEST_SNIPPETS = $(notdir $(basename $(wildcard snippets/*.c)))
+-EXPECTATIONS= $(notdir $(basename $(wildcard snippets/*.variable)))
++EXPECTATIONS = $(notdir $(basename $(wildcard snippets/*.variable)))
+ 
+ ALL_TESTS = timetest test
+ 
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Sat, 16 Apr 2022 10:06:23 -0700
+Subject: [PATCH 06/16] tests: avoid testing syscall snippets if
+ -DINTERCEPT_SYSCALL is not set
+
+See https://bugs.debian.org/1007828
+---
+ test/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/test/Makefile b/test/Makefile
+index 0a76a66..bc6f400 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -13,6 +13,9 @@ ALL_TESTS = timetest test
+ 
+ ifneq ($(filter -DINTERCEPT_SYSCALL,${CFLAGS}),)
+ ALL_TESTS += confirm_variadic_promotion
++else
++TEST_SNIPPETS := $(filter-out syscall%,${TEST_SNIPPETS})
++EXPECTATIONS := $(filter-out syscall%,${EXPECTATIONS})
+ endif
+ 
+ all: $(ALL_TESTS)
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Sat, 16 Apr 2022 10:27:53 -0700
+Subject: [PATCH 07/16] test: remember to clean up repeat_random
+
+---
+ test/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/Makefile b/test/Makefile
+index 1b2a4aa..f7803fc 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -70,7 +70,7 @@ use_lib_%: _use_lib_test.c snippets/%.c lib%.so
+ ## cleanup and metainformation
+ 
+ clean:
+-	@rm -f ${OBJ} timetest getrandom_test syscall_test $(foreach f,${TEST_SNIPPETS},use_lib_${f} lib${f}.so run_${f}) variadic_promotion variadic/*.o
++	@rm -f ${OBJ} timetest getrandom_test syscall_test $(foreach f,${TEST_SNIPPETS},use_lib_${f} lib${f}.so run_${f}) variadic_promotion variadic/*.o repeat_random
+ 
+ distclean: clean
+ 	@echo
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Uli Schlachter <psychon@znc.in>
+Date: Wed, 4 May 2022 14:25:13 +0200
+Subject: [PATCH 08/16] Add test reproducing ASAN-like hangs
+
+Backtraces suggest that AddressSanitizer replaces malloc() with a
+function that
+
+- locks a mutex and
+- calls clock_gettime() while the mutex is held
+
+This commit adds a test that implements a trivial malloc() that behaves
+similarly. Currently, this test hangs.
+
+Signed-off-by: Uli Schlachter <psychon@znc.in>
+---
+ test/Makefile             |  5 ++-
+ test/libmallocintercept.c | 79 +++++++++++++++++++++++++++++++++++++++
+ test/test.sh              |  9 +++++
+ 3 files changed, 92 insertions(+), 1 deletion(-)
+ create mode 100644 test/libmallocintercept.c
+
+diff --git a/test/Makefile b/test/Makefile
+index afdc594..a019c45 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -26,7 +26,7 @@ all: $(ALL_TESTS)
+ timetest: ${OBJ}
+ 	${CC} -o $@ ${OBJ} ${LDFLAGS}
+ 
+-test: timetest functest
++test: timetest functest libmallocintercept.so
+ 	@echo
+ 	@./test.sh
+ 
+@@ -40,6 +40,9 @@ functest:
+ randomtest: repeat_random
+ 	./randomtest.sh
+ 
++libmallocintercept.so: libmallocintercept.c
++	${CC} -shared -o $@ -fpic ${CFLAGS} $<
++
+ # ensure our variadic argument unpacking/repacking works as expected
+ confirm_variadic_promotion: variadic_promotion
+ 	./variadic_promotion
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+new file mode 100644
+index 0000000..363ea95
+--- /dev/null
++++ b/test/libmallocintercept.c
+@@ -0,0 +1,79 @@
++/*
++ *  Copyright (C) 2022 be.storaged GmbH
++ *
++ *  This file is part of libfaketime
++ *
++ *  libfaketime is free software; you can redistribute it and/or modify it
++ *  under the terms of the GNU General Public License v2 as published by the
++ *  Free Software Foundation.
++ *
++ *  libfaketime is distributed in the hope that it will be useful, but WITHOUT
++ *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ *  more details.
++ *
++ *  You should have received a copy of the GNU General Public License v2 along
++ *  with the libfaketime; if not, write to the Free Software Foundation,
++ *  Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <pthread.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++
++static void print_msg(const char *msg) {
++	write(0, msg, strlen(msg));
++}
++
++static void* actual_malloc(size_t size) {
++	/* We would like to use "the real malloc", but cannot. Thus, this
++	 * implements a trivial, allocate-only bump allocator to make things
++	 * work.
++	 */
++	static char memory_arena[16 << 20];
++	static size_t allocated_index = 0;
++
++	void *result = &memory_arena[allocated_index];
++
++	allocated_index += size;
++	/* align to a multiple of 8 bytes */
++	allocated_index = (allocated_index + 7) / 8 * 8;
++
++	if (allocated_index >= sizeof(memory_arena)) {
++		print_msg("libmallocintercept is out of memory!");
++		abort();
++	}
++
++	return result;
++}
++
++static void poke_faketime(void) {
++	/* To complicate things for libfaketime, this calls clock_gettime()
++	 * while holding a lock. This should simulate problems that occurred
++	 * with address sanitizer.
++	 */
++	static pthread_mutex_t time_mutex = PTHREAD_MUTEX_INITIALIZER;
++	struct timespec timespec;
++
++	pthread_mutex_lock(&time_mutex);
++	clock_gettime(CLOCK_REALTIME, &timespec);
++	pthread_mutex_unlock(&time_mutex);
++}
++
++void *malloc(size_t size) {
++	print_msg("Called malloc() from libmallocintercept...");
++	poke_faketime();
++	print_msg("successfully\n");
++	return actual_malloc(size);
++}
++
++void free(void *) {
++	print_msg("Called free() from libmallocintercept...");
++	poke_faketime();
++	print_msg("successfully\n");
++
++	/* We cannot actually free memory */
++}
++
+diff --git a/test/test.sh b/test/test.sh
+index 35f2a52..1ef7439 100755
+--- a/test/test.sh
++++ b/test/test.sh
+@@ -1,6 +1,7 @@
+ #!/bin/sh
+ 
+ FTPL="${FAKETIME_TESTLIB:-../src/libfaketime.so.1}"
++MALLOC_INTERCEPT=./libmallocintercept.so
+ 
+ if [ -f /etc/faketimerc ] ; then
+ 	echo "Running the test program with your system-wide default in /etc/faketimerc"
+@@ -62,6 +63,14 @@ echo "\$ LD_PRELOAD=$FTPL FAKETIME=\"-15d\" date"
+ LD_PRELOAD="$FTPL" FAKETIME="-15d" date
+ echo
+ 
++echo "============================================================================="
++echo
++
++echo "Running the test program with malloc interception"
++echo "\$ LD_PRELOAD=./libmallocintercept.so:$FTPL ./timetest"
++LD_PRELOAD="./libmallocintercept.so:$FTPL" ./timetest
++echo
++
+ echo "============================================================================="
+ echo "Testing finished."
+ 
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Uli Schlachter <psychon@znc.in>
+Date: Wed, 4 May 2022 14:51:35 +0200
+Subject: [PATCH 09/16] Add FAIL_PRE_INIT_CALLS define
+
+This commit adds a new define FAIL_PRE_INIT_CALLS. When that define is
+set, calls to clock_gettime() that occur before ftpl_init() was called
+(due to being marked with __attribute__((constructor))) will just fail
+and return -1.
+
+After this commit, the test case added in the previous commit no longer
+hangs. To make this actually work, this new define is enabled by
+default.
+
+Fixes: https://github.com/wolfcw/libfaketime/issues/365
+Signed-off-by: Uli Schlachter <psychon@znc.in>
+---
+ src/Makefile      |  7 ++++++-
+ src/libfaketime.c | 11 +++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/Makefile b/src/Makefile
+index 62e924c..df72d47 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -27,6 +27,11 @@
+ #           without this, but the performance impact may require you to
+ #           try it unsynchronized.
+ #
++#     FAIL_PRE_INIT_CALLS
++#         - If the time is queried before the library was initialised, let the
++#           call fail instead of trying to initialise on-the-fly. This fixes /
++#           works around hangs that were seen with address sanitizer.
++#
+ #   * Compilation Defines that are unset by default:
+ #
+ #     FAKE_FILE_TIMESTAMPS, FAKE_UTIME
+@@ -110,7 +115,7 @@ PREFIX ?= /usr/local
+ LIBDIRNAME ?= /lib/faketime
+ PLATFORM ?=$(shell uname)
+ 
+-CFLAGS += -std=gnu99 -Wall -Wextra -Werror -Wno-nonnull-compare -DFAKE_PTHREAD -DFAKE_STAT -DFAKE_UTIME -DFAKE_SLEEP -DFAKE_TIMERS -DFAKE_INTERNAL_CALLS -fPIC -DPREFIX='"'$(PREFIX)'"' -DLIBDIRNAME='"'$(LIBDIRNAME)'"' $(FAKETIME_COMPILE_CFLAGS)
++CFLAGS += -std=gnu99 -Wall -Wextra -Werror -Wno-nonnull-compare -DFAKE_PTHREAD -DFAKE_STAT -DFAKE_UTIME -DFAKE_SLEEP -DFAKE_TIMERS -DFAKE_INTERNAL_CALLS -DFAIL_PRE_INIT_CALLS -fPIC -DPREFIX='"'$(PREFIX)'"' -DLIBDIRNAME='"'$(LIBDIRNAME)'"' $(FAKETIME_COMPILE_CFLAGS)
+ ifeq ($(PLATFORM),SunOS)
+ CFLAGS += -D__EXTENSIONS__ -D_XOPEN_SOURCE=600
+ endif
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index f92ecf8..ec80ec8 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -2282,6 +2282,16 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
+   if (!initialized)
+   {
+     recursion_depth++;
++#ifdef FAIL_PRE_INIT_CALLS
++      fprintf(stderr, "libfaketime: clock_gettime() was called before initialization.\n");
++      fprintf(stderr, "libfaketime:  Returning -1 on clock_gettime().\n");
++      if (tp != NULL)
++      {
++        tp->tv_sec = 0;
++        tp->tv_nsec = 0;
++      }
++      return -1;
++#else
+     if (recursion_depth == 2)
+     {
+       fprintf(stderr, "libfaketime: Unexpected recursive calls to clock_gettime() without proper initialization. Trying alternative.\n");
+@@ -2302,6 +2312,7 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
+     else {
+       ftpl_init();
+     }
++#endif
+     recursion_depth--;
+   }
+   /* sanity check */
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Uli Schlachter <psychon@znc.in>
+Date: Sun, 8 May 2022 19:17:27 +0200
+Subject: [PATCH 10/16] Disable FAILRE_PRE_INIT_CALLS by default
+
+Signed-off-by: Uli Schlachter <psychon@znc.in>
+---
+ src/Makefile              | 12 ++++++------
+ test/libmallocintercept.c |  4 ++++
+ 2 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/Makefile b/src/Makefile
+index df72d47..6ece674 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -27,11 +27,6 @@
+ #           without this, but the performance impact may require you to
+ #           try it unsynchronized.
+ #
+-#     FAIL_PRE_INIT_CALLS
+-#         - If the time is queried before the library was initialised, let the
+-#           call fail instead of trying to initialise on-the-fly. This fixes /
+-#           works around hangs that were seen with address sanitizer.
+-#
+ #   * Compilation Defines that are unset by default:
+ #
+ #     FAKE_FILE_TIMESTAMPS, FAKE_UTIME
+@@ -89,6 +84,11 @@
+ #         - avoid that the faketime wrapper complains when running within a
+ #           libfaketime environment
+ #
++#     FAIL_PRE_INIT_CALLS
++#         - If the time is queried before the library was initialised, let the
++#           call fail instead of trying to initialise on-the-fly. This fixes /
++#           works around hangs that were seen with address sanitizer.
++#
+ #   * Compilation addition: second libMT target added for building the pthread-
+ #     enabled library as a separate library
+ #
+@@ -115,7 +115,7 @@ PREFIX ?= /usr/local
+ LIBDIRNAME ?= /lib/faketime
+ PLATFORM ?=$(shell uname)
+ 
+-CFLAGS += -std=gnu99 -Wall -Wextra -Werror -Wno-nonnull-compare -DFAKE_PTHREAD -DFAKE_STAT -DFAKE_UTIME -DFAKE_SLEEP -DFAKE_TIMERS -DFAKE_INTERNAL_CALLS -DFAIL_PRE_INIT_CALLS -fPIC -DPREFIX='"'$(PREFIX)'"' -DLIBDIRNAME='"'$(LIBDIRNAME)'"' $(FAKETIME_COMPILE_CFLAGS)
++CFLAGS += -std=gnu99 -Wall -Wextra -Werror -Wno-nonnull-compare -DFAKE_PTHREAD -DFAKE_STAT -DFAKE_UTIME -DFAKE_SLEEP -DFAKE_TIMERS -DFAKE_INTERNAL_CALLS -fPIC -DPREFIX='"'$(PREFIX)'"' -DLIBDIRNAME='"'$(LIBDIRNAME)'"' $(FAKETIME_COMPILE_CFLAGS)
+ ifeq ($(PLATFORM),SunOS)
+ CFLAGS += -D__EXTENSIONS__ -D_XOPEN_SOURCE=600
+ endif
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index 363ea95..5ed0f67 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -50,6 +50,7 @@ static void* actual_malloc(size_t size) {
+ }
+ 
+ static void poke_faketime(void) {
++#ifdef FAIL_PRE_INIT_CALLS
+ 	/* To complicate things for libfaketime, this calls clock_gettime()
+ 	 * while holding a lock. This should simulate problems that occurred
+ 	 * with address sanitizer.
+@@ -60,6 +61,9 @@ static void poke_faketime(void) {
+ 	pthread_mutex_lock(&time_mutex);
+ 	clock_gettime(CLOCK_REALTIME, &timespec);
+ 	pthread_mutex_unlock(&time_mutex);
++#else
++	print_msg("FAIL_PRE_INIT_CALLS not defined, skipping poke_faketime() ");
++#endif
+ }
+ 
+ void *malloc(size_t size) {
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Uli Schlachter <psychon@znc.in>
+Date: Sun, 8 May 2022 19:20:51 +0200
+Subject: [PATCH 11/16] Add libmallocintercept.so to make clean
+
+Signed-off-by: Uli Schlachter <psychon@znc.in>
+---
+ test/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/Makefile b/test/Makefile
+index a019c45..763ebc4 100644
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -76,7 +76,7 @@ use_lib_%: _use_lib_test.c snippets/%.c lib%.so
+ ## cleanup and metainformation
+ 
+ clean:
+-	@rm -f ${OBJ} timetest getrandom_test syscall_test $(foreach f,${TEST_SNIPPETS},use_lib_${f} lib${f}.so run_${f}) variadic_promotion variadic/*.o repeat_random
++	@rm -f ${OBJ} timetest getrandom_test syscall_test $(foreach f,${TEST_SNIPPETS},use_lib_${f} lib${f}.so run_${f}) variadic_promotion variadic/*.o repeat_random libmallocintercept.so
+ 
+ distclean: clean
+ 	@echo
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolfgang.hommel@unibw.de>
+Date: Sun, 8 May 2022 21:05:10 +0200
+Subject: [PATCH 12/16] silence minor type warning in libmallocintercept.c
+
+---
+ test/libmallocintercept.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index 5ed0f67..0dc5af5 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -73,11 +73,11 @@ void *malloc(size_t size) {
+ 	return actual_malloc(size);
+ }
+ 
+-void free(void *) {
++void free(void *ptr) {
++  void *ptr2 = ptr + 1;
+ 	print_msg("Called free() from libmallocintercept...");
+ 	poke_faketime();
+ 	print_msg("successfully\n");
+ 
+ 	/* We cannot actually free memory */
+ }
+-
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolfgang.hommel@unibw.de>
+Date: Sun, 8 May 2022 21:09:45 +0200
+Subject: [PATCH 13/16] silence minor type warning in libmallocintercept.c
+
+---
+ test/libmallocintercept.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index 0dc5af5..0cf5aeb 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -74,8 +74,7 @@ void *malloc(size_t size) {
+ }
+ 
+ void free(void *ptr) {
+-  void *ptr2 = ptr + 1;
+-	print_msg("Called free() from libmallocintercept...");
++	print_msg("Called free() on %p from libmallocintercept...", ptr);
+ 	poke_faketime();
+ 	print_msg("successfully\n");
+ 
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolfgang.hommel@unibw.de>
+Date: Sun, 8 May 2022 21:20:29 +0200
+Subject: [PATCH 14/16] silence minor type warning in libmallocintercept.c
+
+---
+ test/libmallocintercept.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index 0cf5aeb..a649e9e 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -74,7 +74,8 @@ void *malloc(size_t size) {
+ }
+ 
+ void free(void *ptr) {
+-	print_msg("Called free() on %p from libmallocintercept...", ptr);
++  void *ptr2 = ptr; ptr2 -= ptr;
++	print_msg("Called free() on from libmallocintercept...");
+ 	poke_faketime();
+ 	print_msg("successfully\n");
+ 
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wolfgang Hommel <wolfgang.hommel@unibw.de>
+Date: Sun, 8 May 2022 21:24:51 +0200
+Subject: [PATCH 15/16] silence minor type warning in libmallocintercept.c
+
+---
+ test/libmallocintercept.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index a649e9e..e789d34 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -74,7 +74,7 @@ void *malloc(size_t size) {
+ }
+ 
+ void free(void *ptr) {
+-  void *ptr2 = ptr; ptr2 -= ptr;
++  long int ptr2 = (long int) ptr; ptr2 -= (long int) ptr;
+ 	print_msg("Called free() on from libmallocintercept...");
+ 	poke_faketime();
+ 	print_msg("successfully\n");
+-- 
+2.36.1
+
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Uli Schlachter <psychon@znc.in>
+Date: Mon, 9 May 2022 13:53:51 +0200
+Subject: [PATCH 16/16] Fix another hang under ASAN
+
+We have a long-running program that we want to run under sanitizers for
+extra error checking and under faketime to speed up the clock. This
+program hangs after a while. Backtraces suggest that the hangs occur
+because of recursion in the memory allocator, which apparently locks a
+non-recursive mutex.
+
+Specifically, what we see is that due to our use of FAKETIME_NO_CACHE=1,
+libfaketime wants to reload the config file inside a (random) call to
+clock_gettime(). libfaketime then uses fopen() / fclose() for reading
+the config files. These function allocate / free a buffer for reading
+data and specifically the call to free() that happens inside fclose()
+ends up calling clock_gettime() again. At this point, libfaketime locks
+up because it has a time_mutex that is locked and none-recursive.
+
+Sadly, I did not manage to come up with a stand-alone reproducer for
+this problem. Also, the above description is from memory after half a
+week of vacation, so it might be (partially) wrong.
+
+More information can be found here:
+
+- https://github.com/wolfcw/libfaketime/issues/365#issuecomment-1115802530
+- https://github.com/wolfcw/libfaketime/issues/365#issuecomment-1116178907
+
+This commit first adds a test case. This new test uses the already
+existing libmallocintercept.so to cause calls to clock_gettime() during
+memory allocation routines. The difference to the already existing
+version is that additionally FAKETIME_NO_CACHE and
+FAKETIME_TIMESTAMP_FILE are set. This new test hung with its last output
+suggesting a recursive call to malloc:
+
+Called malloc() from libmallocintercept...successfully
+Called free() on from libmallocintercept...successfully
+Called malloc() from libmallocintercept...Called malloc() from libmallocintercept...
+
+Sadly, gdb was unable to provide a meaningful backtrace for this hang.
+
+Next, I replaced the use of fopen()/fgets()/fgets() with
+open()/read()/close(). This code no longer reads the config file
+line-by-line, but instead it reads all of it at once and then "filters
+out" the result (ignores comment lines, removes end of line markers).
+
+I tried to keep the behaviour of the code the same, but I know at least
+one difference: Previously, the config file was read line-by-line and
+lines that began with a comment character were immediately ignored. The
+new code only reads the config once and then removes comment lines.
+Since the buffer that is used contains only 256 characters, it is
+possible that config files that were previously parsed correctly now
+longer parse. A specific example: if a file begins with 500 '#'
+characters in its first line and then a timestamp in the second line,
+the old code was able to parse this file while the new code would only
+see an empty file.
+
+After this change, the new test no longer hangs. Sadly, I do not
+actually know its effect on the "actual bug" that I wanted to fix, but
+since there are no longer any calls to fclose(), there cannot be any
+hangs inside fclose().
+
+Signed-off-by: Uli Schlachter <psychon@znc.in>
+---
+ src/libfaketime.c | 71 ++++++++++++++++++++++++++++-------------------
+ test/test.sh      | 10 +++++++
+ 2 files changed, 53 insertions(+), 28 deletions(-)
+
+diff --git a/src/libfaketime.c b/src/libfaketime.c
+index ec80ec8..2f26bd4 100644
+--- a/src/libfaketime.c
++++ b/src/libfaketime.c
+@@ -2968,20 +2968,40 @@ static void ftpl_init(void)
+  *      =======================================================================
+  */
+ 
+-static void remove_trailing_eols(char *line)
++static void prepare_config_contents(char *contents)
+ {
+-  char *endp = line + strlen(line);
+-  /*
+-   * erase the last char if it's a newline
+-   * or carriage return, and back up.
+-   * keep doing this, but don't back up
+-   * past the beginning of the string.
++  /* This function
++   * - removes line separators (\r and \n)
++   * - removes lines beginning with a comment character (# or ;)
+    */
+-# define is_eolchar(c) ((c) == '\n' || (c) == '\r')
+-  while (endp > line && is_eolchar(endp[-1]))
+-  {
+-    *--endp = '\0';
++  char *read_position = contents;
++  char *write_position = contents;
++  bool in_comment = false;
++  bool beginning_of_line = true;
++
++  while (*read_position != '\0') {
++    if (beginning_of_line && (*read_position == '#' || *read_position == ';')) {
++      /* The line begins with a comment character and should be completely ignored */
++      in_comment = true;
++    }
++    beginning_of_line = false;
++
++    if (*read_position == '\n') {
++      /* We reached the end of the line that should be ignored (if any is ignored) */
++      in_comment = false;
++      /* The next character begins a new line */
++      beginning_of_line = true;
++    }
++
++    /* If we are not in a comment and are not looking at a line break, copy the
++     * character from the read position to the write position. */
++    if (!in_comment && *read_position != '\r' && *write_position != '\n') {
++      *write_position = *read_position;
++      write_position++;
++    }
++    read_position++;
+   }
++  *write_position = '\0';
+ }
+ 
+ 
+@@ -3018,30 +3038,25 @@ int read_config_file()
+   static char user_faked_time[BUFFERLEN]; /* changed to static for caching in v0.6 */
+   static char custom_filename[BUFSIZ];
+   static char filename[BUFSIZ];
+-  FILE *faketimerc;
++  int faketimerc;
+   /* check whether there's a .faketimerc in the user's home directory, or
+    * a system-wide /etc/faketimerc present.
+    * The /etc/faketimerc handling has been contributed by David Burley,
+    * Jacob Moorman, and Wayne Davison of SourceForge, Inc. in version 0.6 */
+   (void) snprintf(custom_filename, BUFSIZ, "%s", getenv("FAKETIME_TIMESTAMP_FILE"));
+   (void) snprintf(filename, BUFSIZ, "%s/.faketimerc", getenv("HOME"));
+-  if ((faketimerc = fopen(custom_filename, "rt")) != NULL ||
+-      (faketimerc = fopen(filename, "rt")) != NULL ||
+-      (faketimerc = fopen("/etc/faketimerc", "rt")) != NULL)
+-  {
+-    static char line[BUFFERLEN];
+-    while (fgets(line, BUFFERLEN, faketimerc) != NULL)
+-    {
+-      if ((strlen(line) > 1) && (line[0] != ' ') &&
+-          (line[0] != '#') && (line[0] != ';'))
+-      {
+-        remove_trailing_eols(line);
+-        strncpy(user_faked_time, line, BUFFERLEN-1);
+-        user_faked_time[BUFFERLEN-1] = 0;
+-        break;
+-      }
++  if ((faketimerc = open(custom_filename, O_RDONLY)) != -1 ||
++      (faketimerc = open(filename, O_RDONLY)) != -1 ||
++      (faketimerc = open("/etc/faketimerc", O_RDONLY)) != -1)
++  {
++    ssize_t length = read(faketimerc, user_faked_time, sizeof(user_faked_time) - 1);
++    close(faketimerc);
++    if (length < 0) {
++      length = 0;
+     }
+-    fclose(faketimerc);
++    user_faked_time[length] = 0;
++
++    prepare_config_contents(user_faked_time);
+     parse_ft_string(user_faked_time);
+     return 1;
+   }
+diff --git a/test/test.sh b/test/test.sh
+index 1ef7439..b03077d 100755
+--- a/test/test.sh
++++ b/test/test.sh
+@@ -71,6 +71,16 @@ echo "\$ LD_PRELOAD=./libmallocintercept.so:$FTPL ./timetest"
+ LD_PRELOAD="./libmallocintercept.so:$FTPL" ./timetest
+ echo
+ 
++echo "============================================================================="
++echo
++
++echo "@2005-03-29 14:14:14" > .faketimerc-for-test
++echo "Running the test program with malloc interception and file faketimerc"
++echo "\$ FAKETIME_NO_CACHE=1 FAKETIME_TIMESTAMP_FILE=.faketimerc-for-test LD_PRELOAD=./libmallocintercept.so:$FTPL ./timetest"
++FAKETIME_NO_CACHE=1 FAKETIME_TIMESTAMP_FILE=.faketimerc-for-test LD_PRELOAD="./libmallocintercept.so:$FTPL" ./timetest
++rm .faketimerc-for-test
++echo
++
+ echo "============================================================================="
+ echo "Testing finished."
+ 
+-- 
+2.36.1
+

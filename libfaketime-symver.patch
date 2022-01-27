@@ -1,8 +1,8 @@
 diff --git a/src/libfaketime.c b/src/libfaketime.c
-index b70a3d3..19f6234 100644
+index 18e2c94..363f38c 100644
 --- a/src/libfaketime.c
 +++ b/src/libfaketime.c
-@@ -1643,6 +1643,7 @@ timer_settime_common(timer_t_or_int timerid, int flags,
+@@ -1936,6 +1936,7 @@ timer_settime_common(timer_t_or_int timerid, int flags,
  /*
   * Faked timer_settime() compatible with implementation in GLIBC 2.2
   */
@@ -10,7 +10,7 @@ index b70a3d3..19f6234 100644
  int timer_settime_22(int timerid, int flags,
           const struct itimerspec *new_value,
           struct itimerspec *old_value)
-@@ -1665,6 +1666,7 @@ int timer_settime_22(int timerid, int flags,
+@@ -1958,6 +1959,7 @@ int timer_settime_22(int timerid, int flags,
  /*
   * Faked timer_settime() compatible with implementation in GLIBC 2.3.3
   */
@@ -18,7 +18,7 @@ index b70a3d3..19f6234 100644
  int timer_settime_233(timer_t timerid, int flags,
        const struct itimerspec *new_value,
        struct itimerspec *old_value)
-@@ -1735,6 +1737,7 @@ int timer_gettime_common(timer_t_or_int timerid, struct itimerspec *curr_value,
+@@ -2031,6 +2033,7 @@ int timer_gettime_common(timer_t_or_int timerid, struct itimerspec *curr_value,
  /*
   * Faked timer_gettime() compatible with implementation in GLIBC 2.2
   */
@@ -26,7 +26,7 @@ index b70a3d3..19f6234 100644
  int timer_gettime_22(timer_t timerid, struct itimerspec *curr_value)
  {
    if (!initialized)
-@@ -1755,6 +1758,7 @@ int timer_gettime_22(timer_t timerid, struct itimerspec *curr_value)
+@@ -2051,6 +2054,7 @@ int timer_gettime_22(timer_t timerid, struct itimerspec *curr_value)
  /*
   * Faked timer_gettime() compatible with implementation in GLIBC 2.3.3
   */
@@ -34,7 +34,7 @@ index b70a3d3..19f6234 100644
  int timer_gettime_233(timer_t timerid, struct itimerspec *curr_value)
  {
    if (!initialized)
-@@ -1772,10 +1776,6 @@ int timer_gettime_233(timer_t timerid, struct itimerspec *curr_value)
+@@ -2068,10 +2072,6 @@ int timer_gettime_233(timer_t timerid, struct itimerspec *curr_value)
    }
  }
  
@@ -43,9 +43,9 @@ index b70a3d3..19f6234 100644
 -__asm__(".symver timer_settime_22, timer_settime@GLIBC_2.2");
 -__asm__(".symver timer_settime_233, timer_settime@@GLIBC_2.3.3");
  
- #endif
- #endif
-@@ -3012,6 +3012,11 @@ struct pthread_cond_monotonic {
+ #ifdef __linux__
+ /*
+@@ -3463,6 +3463,11 @@ struct pthread_cond_monotonic {
  
  static struct pthread_cond_monotonic *monotonic_conds = NULL;
  
@@ -57,7 +57,7 @@ index b70a3d3..19f6234 100644
  int pthread_cond_init_232(pthread_cond_t *restrict cond, const pthread_condattr_t *restrict attr)
  {
    clockid_t clock_id;
-@@ -3039,6 +3044,11 @@ int pthread_cond_init_232(pthread_cond_t *restrict cond, const pthread_condattr_
+@@ -3501,6 +3506,11 @@ int pthread_cond_init_232(pthread_cond_t *restrict cond, const pthread_condattr_
    return result;
  }
  
@@ -69,7 +69,7 @@ index b70a3d3..19f6234 100644
  int pthread_cond_destroy_232(pthread_cond_t *cond)
  {
    struct pthread_cond_monotonic* e;
-@@ -3146,26 +3156,22 @@ int pthread_cond_timedwait_common(pthread_cond_t *cond, pthread_mutex_t *mutex,
+@@ -3608,26 +3618,22 @@ int pthread_cond_timedwait_common(pthread_cond_t *cond, pthread_mutex_t *mutex,
    return result;
  }
  

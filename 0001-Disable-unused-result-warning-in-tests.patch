@@ -1,0 +1,27 @@
+From eaa86dbed279351c845f5ed9525595ee9714b166 Mon Sep 17 00:00:00 2001
+From: Pablo Greco <pgreco@centosproject.org>
+Date: Tue, 10 May 2022 12:29:40 -0300
+Subject: [PATCH] Disable unused-result-warning in tests
+
+---
+ test/libmallocintercept.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/test/libmallocintercept.c b/test/libmallocintercept.c
+index e789d34..103eac2 100644
+--- a/test/libmallocintercept.c
++++ b/test/libmallocintercept.c
+@@ -24,7 +24,10 @@
+ #include <unistd.h>
+ 
+ static void print_msg(const char *msg) {
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wunused-result"
+ 	write(0, msg, strlen(msg));
++#pragma GCC diagnostic pop
+ }
+ 
+ static void* actual_malloc(size_t size) {
+-- 
+2.36.1
+

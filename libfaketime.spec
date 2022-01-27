@@ -1,13 +1,14 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
-Version: 0.9.8
-Release: 13%{?dist}
+Version: 0.9.10
+Release: 1%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
-Source: libfaketime-0.9.8.tar.xz
-Patch0: libfaketime-0.9.8-FORCE_PTHREAD_NONVER.patch
+Source: libfaketime-0.9.10.tar.gz
+Patch0: libfaketime-backports.patch
 Patch1: libfaketime-symver.patch
-Patch2: libfaketime-fixgcc10.patch
+Patch2: 0001-Disable-unused-result-warning-in-tests.patch
+Patch3: 0001-Fix-gettimeofday-aarch64_epel8.patch
 
 Provides: faketime
 
@@ -15,6 +16,9 @@ BuildRequires:  gcc
 BuildRequires:  perl-interpreter
 BuildRequires:  perl-Time-HiRes
 BuildRequires: make
+%if 0%{?fedora} >= 36
+Excludearch: %{ix86} %{arm}
+%endif
 
 %description
 libfaketime intercepts various system calls which programs use to
@@ -29,9 +33,17 @@ time system- wide.
 %if 0%{?fedora} >= 32 || 0%{?rhel} >= 9
 %patch1 -p1
 %endif
+%if 0%{?fedora} >= 36
 %patch2 -p1
+%endif
+%if 0%{?rhel} == 8
+%ifarch aarch64
+%patch3 -p1
+%endif
+%endif
 
 %build
+
 cd src
 
 # https://github.com/wolfcw/libfaketime/blob/master/README.packagers
@@ -62,7 +74,7 @@ FAKETIME_COMPILE_CFLAGS="BOGUS"
     unset FAKETIME_COMPILE_CFLAGS
   %endif
 %endif
-%if 0%{?fedora} >= 31
+%if 0%{?fedora} >= 31 || 0%{?rhel} >=9
   # for reasons we don't know the old glibc workaround is required here but not on archv7hl and aarch64 ...
   %ifarch i686 x86_64 s390x
     echo "force_monotonic"
@@ -104,6 +116,10 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Tue May 10 2022 Pablo Greco <pgreco@centosproject.org> - 0.9.10-1
+- Update to 0.9.10
+- Disable i686 and armhfp in fedora >=36
+
 * Thu Jan 20 2022 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.8-13
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
 
