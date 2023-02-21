@@ -116,7 +116,7 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
-* Tue Mar 21 2023 Pablo Greco <pgreco@centosproject.org> - 0.9.10-4
+* Tue Feb 21 2023 Pablo Greco <pgreco@centosproject.org> - 0.9.10-4
 - Also disable i686 in rhel>=10 (ELN failures)
 
 * Thu Jan 19 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.10-3
