@@ -33,7 +33,7 @@ time system- wide.
 %if 0%{?fedora} >= 32 || 0%{?rhel} >= 9
 %patch1 -p1
 %endif
-%if 0%{?fedora} >= 36
+%if 0%{?fedora} >= 36 || 0%{?rhel} >= 10
 %patch2 -p1
 %endif
 %if 0%{?rhel} == 8
