@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.10
-Release: 6%{?dist}
+Release: 6.rv64%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.10.tar.gz
@@ -80,7 +80,7 @@ FAKETIME_COMPILE_CFLAGS="BOGUS"
     echo "force_monotonic"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX"
   %endif
-  %ifarch ppc64le
+  %ifarch ppc64le riscv64
     echo "force_monotonic and pthread_nonver"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
   %endif
