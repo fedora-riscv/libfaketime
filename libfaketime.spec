@@ -1,7 +1,7 @@
 Summary: Manipulate system time per process for testing purposes
 Name: libfaketime
 Version: 0.9.10
-Release: 5%{?dist}
+Release: 5.rv64%{?dist}
 License: GPLv2+
 Url: https://github.com/wolfcw/libfaketime
 Source: libfaketime-0.9.10.tar.gz
@@ -80,7 +80,7 @@ FAKETIME_COMPILE_CFLAGS="BOGUS"
     echo "force_monotonic"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX"
   %endif
-  %ifarch ppc64le
+  %ifarch ppc64le riscv64
     echo "force_monotonic and pthread_nonver"
     export FAKETIME_COMPILE_CFLAGS="-DFORCE_MONOTONIC_FIX -DFORCE_PTHREAD_NONVER"
   %endif
@@ -116,6 +116,9 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
+* Fri Dec 27 2023 Jiasheng Zhao <JasenChao@gmail.com> - 0.9.10-5.rv64
+- Rebuild for f40-rv64
+
 * Wed Feb 22 2023 Pablo Greco <pgreco@centosproject.org> - 0.9.10-5
 - Fix tests in ELN builds (yselkowitz)
 
