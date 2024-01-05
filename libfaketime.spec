@@ -116,7 +116,7 @@ chmod a+rx %{buildroot}/%{_libdir}/faketime/*.so.*
 %{_mandir}/man1/*
 
 %changelog
-* Fri Dec 27 2023 Jiasheng Zhao <JasenChao@gmail.com> - 0.9.10-6.rv64
+* Fri Jan 05 2024 Jiasheng Zhao <JasenChao@gmail.com> - 0.9.10-7
 - Rebuild for f39-rv64
 
 * Thu Jul 20 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.10-6
